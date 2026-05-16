@@ -44,9 +44,20 @@ ENV TZ=America/Sao_Paulo \
 WORKDIR /opt/site
 COPY runtime/site /opt/site/
 COPY runtime/painel /opt/painel/
-# Note: runtime/request/ (the Flash client gateway) is NOT hosted on the Mac
-# stack. Mono+xsp4 hangs serving Tank.Request.dll; the official Windows
-# client runs this app on IIS instead. See README ("Cliente Windows").
+COPY runtime/request /opt/request/
+
+# Mono ASP.NET's batch compilation hangs on the Request app's 130+ aspx;
+# the runtime/request/Web.config has `batch="false"` to force lazy compile
+# (one aspx at a time, on demand). Also fix the bin/ vs Bin/ case.
+RUN if [ -d /opt/request/Bin ] && [ ! -e /opt/request/bin ]; then \
+      ln -s Bin /opt/request/bin; \
+    fi \
+ && rm -f /opt/request/Global.asax.cs \
+ && printf '%s\n' \
+      '<%@ Application Language="C#" %>' \
+      '<script runat="server">' \
+      '  void Application_Start(object sender, EventArgs e) { }' \
+      '</script>' > /opt/request/Global.asax
 
 # .aspx pages reference master pages with inconsistent casing (e.g.
 # ~/Homen.master while the real file is Homen.Master). Add lowercase

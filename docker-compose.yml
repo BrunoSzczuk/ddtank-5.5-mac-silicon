@@ -20,6 +20,12 @@ services:
       - "9200:9200"
       - "9202:9202"
       - "9208:9208"
+      # WebSocket bridge ports (ws-road, ws-center, ws-fighting). These run in
+      # sidecar containers that share this network namespace, so the host port
+      # binding has to be declared here on the namespace owner.
+      - "9300:9300"
+      - "9302:9302"
+      - "9308:9308"
     networks:
       default:
         aliases:
@@ -51,6 +57,37 @@ services:
     command: ["run-service", "Road"]
     stdin_open: true
     tty: true
+    restart: "no"
+
+  # WebSocket -> TCP bridges so Ruffle (in the browser) can talk to the game
+  # sockets that the Flash client opens on 9200/9202/9208. Each bridge is a
+  # tiny container sharing Center's network namespace, listening on a public
+  # port and forwarding to the TCP service on 127.0.0.1 in that namespace.
+  ws-center:
+    image: efrecon/websockify:latest
+    container_name: ddt-ws-center
+    depends_on:
+      - center
+    network_mode: "service:center"
+    command: ["0.0.0.0:9302", "127.0.0.1:9202"]
+    restart: "no"
+
+  ws-fighting:
+    image: efrecon/websockify:latest
+    container_name: ddt-ws-fighting
+    depends_on:
+      - center
+    network_mode: "service:center"
+    command: ["0.0.0.0:9308", "127.0.0.1:9208"]
+    restart: "no"
+
+  ws-road:
+    image: efrecon/websockify:latest
+    container_name: ddt-ws-road
+    depends_on:
+      - center
+    network_mode: "service:center"
+    command: ["0.0.0.0:9300", "127.0.0.1:9200"]
     restart: "no"
 
   site:

@@ -20,6 +20,11 @@ SITE_PID=$!
   > /var/log/xsp/painel.log 2>&1 &
 PAINEL_PID=$!
 
+# XSP4 hosting Request (Flash client gateway) on 8092
+( cd /opt/request && xsp4 --port 8092 --address 127.0.0.1 --nonstop ) \
+  > /var/log/xsp/request.log 2>&1 &
+REQUEST_PID=$!
+
 # php-fpm
 "$PHP_FPM_BIN" --nodaemonize --fpm-config /etc/php/${PHP_VER}/fpm/php-fpm.conf \
   > /var/log/php-fpm.log 2>&1 &

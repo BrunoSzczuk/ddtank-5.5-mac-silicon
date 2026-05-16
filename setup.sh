@@ -44,6 +44,34 @@ if [ ! -d runtime/Center ]; then
     runtime/Road/Road.Service.exe.config
 fi
 
+if [ ! -d runtime/request ]; then
+  cp -R Servidor5.5/Request runtime/request
+  sed -i.bak \
+    -e 's|Data Source=WIN-IJR04FJ3H42|Data Source=mssql,1433|g' \
+    -e 's|net\.tcp://192\.99\.235\.98|net.tcp://gameserver|g' \
+    -e 's|http://192\.99\.235\.98:9001|http://localhost:9001|g' \
+    -e 's|http://192\.99\.235\.98:840|http://localhost:840|g' \
+    -e 's|http://192\.99\.235\.98|http://localhost:8080|g' \
+    -e 's|bin\\Languages\\Language-vn.txt|bin/Languages/Language-vn.txt|g' \
+    -e 's|<compilation debug="true" targetFramework="4.0">|<compilation debug="false" batch="false" targetFramework="4.0">|' \
+    runtime/request/Web.config
+  # Drop the codebehind Global.asax that tries to wire Tank.Request.Global —
+  # we use a minimal inline one to skip the Application_Start chain.
+  rm -f runtime/request/Global.asax.cs
+  cat > runtime/request/Global.asax <<'EOG'
+<%@ Application Language="C#" %>
+<script runat="server">
+  void Application_Start(object sender, EventArgs e) { }
+</script>
+EOG
+  # The Language file isn't shipped in Bin/Languages/ in the original tree —
+  # copy it from obj/ where the publisher left it.
+  if [ -f runtime/request/obj/Release/Package/PackageTmp/bin/Languages/Language-vn.txt ]; then
+    mkdir -p runtime/request/Bin/Languages
+    cp runtime/request/obj/Release/Package/PackageTmp/bin/Languages/Language-vn.txt runtime/request/Bin/Languages/
+  fi
+fi
+
 if [ ! -d runtime/site ]; then
   cp -R "Servidor5.5/Novo Site" runtime/site
   sed -i.bak \
@@ -71,9 +99,24 @@ if [ ! -d runtime/site ]; then
   # and the _sqlsrv_shim.php itself). These come from patches/site/.
   for f in patches/site/_sqlsrv_shim.php \
            patches/site/login.php \
-           patches/site/ajax.php; do
+           patches/site/ajax.php \
+           patches/site/play.php \
+           patches/site/config.xml \
+           patches/site/md5.xml; do
     [ -f "$f" ] && cp "$f" "runtime/site/$(basename "$f")"
   done
+
+  # Download self-hosted Ruffle nightly (the released 0.2.0 has worse AS3
+  # support than the nightlies; we want the latest). Skipped if the user
+  # already vendored a copy.
+  if [ ! -d runtime/site/ruffle ]; then
+    require /usr/bin/curl
+    mkdir -p runtime/site/ruffle
+    /usr/bin/curl -L -s -o /tmp/ruffle.zip \
+      "https://github.com/ruffle-rs/ruffle/releases/download/nightly-2026-05-16/ruffle-nightly-2026_05_16-web-selfhosted.zip"
+    (cd runtime/site/ruffle && unzip -oq /tmp/ruffle.zip)
+    rm -f /tmp/ruffle.zip
+  fi
 fi
 
 if [ ! -d runtime/painel ]; then

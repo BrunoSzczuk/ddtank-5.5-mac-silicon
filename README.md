@@ -52,25 +52,29 @@ Cada um destes ajustes está versionado no repo, não em runtime puro:
 - **`runtime/site/login.php`** — chamada para `Mem_Users_Accede` reescrita
   com inline EXEC + SELECT (PHP ODBC não suporta OUT parameters).
 
-## Para jogar de fato — precisa de um Windows na rede
+## Estado atual: backend 100%, cliente Flash 99% via Ruffle
 
-O **backend é Mac-nativo** (esse repo), mas o **cliente DDTank é Windows-nativo**:
-ele precisa de Flash Player real (não emulado) pra abrir socket TCP no Center, e
-de um trecho ASP.NET (`Servidor5.5/Request/`) que o Mono trava ao executar.
+Tudo do **server-side** roda no Mac:
+- SQL Server, Center, Fighting, Road, Site PHP, Painel admin
+- **Request app** (gateway ASP.NET do cliente Flash) destravado no Mono — `batch="false"` no Web.config evita o hang do batch-compile do xsp4
+- **WebSocket↔TCP bridges** (`ws-center`, `ws-fighting`, `ws-road`) via `efrecon/websockify` — convertem `flash.net.Socket` do browser pros sockets TCP do Center/Fighting/Road
 
-Validei com Ruffle (extensão do Chrome no macOS) e cheguei até o splash do jogo,
-mas a chain trava em `/Request/CreateLogin.aspx` no Mono+xsp4. Tentar destravar
-sem o source do `Tank.Request.dll` é debug às cegas, e mesmo com isso o Ruffle
-tem suporte parcial a AS3 sockets — o jogo dificilmente passaria do login.
+E o **cliente roda no browser via Ruffle**:
+- `play.php` embute Ruffle.js (self-hosted em `/ruffle/`) + config `socketProxy`
+- Ao acessar `http://localhost:8080/login.php`, logar e clicar jogar, o Loading.swf carrega no browser e renderiza o **splash do DDTANK** (mascote + dragão + barra de progresso)
 
-**Caminho recomendado**: deixa o Mac rodando o backend e usa um PC Windows
-(físico, VM Parallels ou UTM) na mesma rede como cliente. Passo a passo
-completo em [`docs/CLIENT-WINDOWS.md`](docs/CLIENT-WINDOWS.md).
+Mas: o `UIModuleLoader` do DDTank (carregador modular customizado da pickgliss/7Road, usa `Loader.loadBytes()` + `ApplicationDomain.parentDomain`) bate em limitações do **AS3 alpha do Ruffle** ([state](https://github.com/ruffle-rs/ruffle/wiki/Compatibility)) — o splash aparece mas o `DDT_Loading.swf` nunca é solicitado depois. Tudo do lado servidor está pronto pra quando o Ruffle terminar suporte AS3 (eles melhoram a cada release), ou pra um cliente Flash real.
 
-Resumo:
-- Mac (esse repo): SQL, Center, Fighting, Road, Site PHP, Painel admin
-- Windows: IIS hospedando `Request/`, Flash Projector abrindo `Loading.swf`
-- Conectados pela LAN no IP do Mac (`192.168.0.x:1433`, `:9202`, etc.)
+### Como jogar de fato hoje
+
+**Opção A — Flash Projector legacy** (chance maior): baixar do Internet Archive
+[Adobe Flash Player projector 32.0.0.363](https://archive.org/details/flashplayer32_0r0_363_win_sa) e abrir:
+```
+http://localhost:8080/Flash/Loading.swf?user=jogador1&key=test&config=http://localhost:8080/config.xml
+```
+Flash Player real tem 100% do AS3 — UIModuleLoader funciona, socket TCP funciona direto sem websockify.
+
+**Opção B — Esperar o Ruffle**: acessar `http://localhost:8080/login.php`, logar (`jogador1` / `NovaSenha9999`), clicar jogar. Splash renderiza. Em alguns meses, Ruffle deve completar o que falta.
 
 ## Operação
 
