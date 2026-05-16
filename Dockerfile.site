@@ -1,0 +1,66 @@
+FROM debian:bookworm-slim AS shim-builder
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends gcc libc6-dev \
+  && rm -rf /var/lib/apt/lists/*
+COPY scripts/fakekernel32.c /tmp/fakekernel32.c
+RUN gcc -shared -fPIC -O2 -o /tmp/libfakekernel32.so /tmp/fakekernel32.c
+
+FROM mono:6.12
+
+# Debian buster repos moved to archive.debian.org. Point apt there so we can
+# install mono-xsp4 (the .aspx app host) and PHP for the mixed PHP/.aspx site.
+RUN printf '%s\n' \
+      'deb http://archive.debian.org/debian buster main' \
+      'deb http://archive.debian.org/debian-security buster/updates main' \
+      > /etc/apt/sources.list \
+  && apt-get -o Acquire::Check-Valid-Until=false update \
+  && apt-get install -y --no-install-recommends \
+       mono-xsp4 nginx \
+       php-fpm php-cli php-odbc \
+       unixodbc tdsodbc freetds-bin freetds-common \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /run/php /var/log/xsp
+
+# Configure FreeTDS as the ODBC driver named "FreeTDS" so PHP odbc_connect()
+# works with DSN-less strings like "Driver=FreeTDS;Server=mssql;Port=1433;..."
+RUN printf '%s\n' \
+      '[FreeTDS]' \
+      'Description=FreeTDS Driver' \
+      'Driver=/usr/lib/aarch64-linux-gnu/odbc/libtdsodbc.so' \
+      'Setup=/usr/lib/aarch64-linux-gnu/odbc/libtdsS.so' \
+      'UsageCount=1' \
+      > /etc/odbcinst.ini \
+  && printf '%s\n' \
+      '[mssql]' \
+      'Driver=FreeTDS' \
+      'Server=mssql' \
+      'Port=1433' \
+      'TDS_Version=7.4' \
+      > /etc/odbc.ini
+
+ENV TZ=America/Sao_Paulo \
+    MONO_IOMAP=all
+
+WORKDIR /opt/site
+COPY runtime/site /opt/site/
+COPY runtime/painel /opt/painel/
+
+# .aspx pages reference master pages with inconsistent casing (e.g.
+# ~/Homen.master while the real file is Homen.Master). Add lowercase
+# symlinks so both casings resolve.
+COPY scripts/create-case-links.sh /usr/local/bin/create-case-links
+RUN chmod +x /usr/local/bin/create-case-links \
+  && create-case-links /opt/site \
+  && create-case-links /opt/painel
+
+COPY --from=shim-builder /tmp/libfakekernel32.so /usr/local/lib/libfakekernel32.so
+RUN ldconfig \
+  && sed -i 's|</configuration>|  <dllmap dll="kernel32" target="/usr/local/lib/libfakekernel32.so" />\n  <dllmap dll="kernel32.dll" target="/usr/local/lib/libfakekernel32.so" />\n</configuration>|' /etc/mono/config
+
+# nginx config: PHP via php-fpm, .aspx/.ashx via xsp4 (proxy_pass)
+COPY scripts/site-nginx.conf /etc/nginx/sites-available/default
+COPY scripts/start-site.sh /usr/local/bin/start-site
+RUN chmod +x /usr/local/bin/start-site
+
+EXPOSE 80 8081
+CMD ["start-site"]

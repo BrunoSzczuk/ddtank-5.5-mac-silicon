@@ -1,0 +1,95 @@
+services:
+  center:
+    build:
+      context: .
+      dockerfile: Dockerfile.emulator
+    image: ddt-emulator:latest
+    container_name: ddt-center
+    depends_on:
+      mssql:
+        condition: service_healthy
+    extra_hosts:
+      - "gameserver:127.0.0.1"
+    ports:
+      - "2008:2008"
+      - "2009:2009"
+      - "9200:9200"
+      - "9202:9202"
+      - "9208:9208"
+    networks:
+      default:
+        aliases:
+          - gameserver
+    command: ["run-service", "Center"]
+    stdin_open: true
+    tty: true
+    restart: "no"
+
+  fighting:
+    image: ddt-emulator:latest
+    container_name: ddt-fighting
+    depends_on:
+      center:
+        condition: service_started
+    network_mode: "service:center"
+    command: ["run-service", "Fighting"]
+    stdin_open: true
+    tty: true
+    restart: "no"
+
+  road:
+    image: ddt-emulator:latest
+    container_name: ddt-road
+    depends_on:
+      center:
+        condition: service_started
+    network_mode: "service:center"
+    command: ["run-service", "Road"]
+    stdin_open: true
+    tty: true
+    restart: "no"
+
+  site:
+    build:
+      context: .
+      dockerfile: Dockerfile.site
+    image: ddt-site:latest
+    container_name: ddt-site
+    depends_on:
+      mssql:
+        condition: service_healthy
+      center:
+        condition: service_started
+    networks:
+      default:
+        aliases:
+          - site
+    ports:
+      - "8080:80"
+      - "8081:8081"
+    restart: "no"
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    platform: linux/amd64
+    container_name: ddt-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "ddtank@2016"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+      - ./Servidor5.5/DataBases:/backup:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -No -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  mssql-data:

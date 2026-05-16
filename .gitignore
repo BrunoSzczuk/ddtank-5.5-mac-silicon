@@ -1,0 +1,23 @@
+# The 2.6 GB original archive and its extracted 5 GB tree are not stored in git.
+# setup.sh extracts Servidor5.5.rar locally on first run.
+Servidor5.5.rar
+Servidor5.5/
+
+# runtime/ is a derived workdir (sed-patched copy of Servidor5.5/Emulador, Novo Site, Painel).
+# setup.sh recreates it on first run.
+runtime/
+
+# sed backup files left over while iterating on configs.
+*.bak
+*.bak[0-9]
+*.bak[0-9][0-9]
+*.bakphp*
+
+# Temp dump files used during reverse engineering.
+*.il
+
+# macOS noise.
+.DS_Store
+
+# Docker volume mount points & local logs (created at runtime).
+*.log

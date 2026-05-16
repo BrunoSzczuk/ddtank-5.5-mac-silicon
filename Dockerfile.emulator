@@ -1,0 +1,38 @@
+FROM debian:bookworm-slim AS shim-builder
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends gcc libc6-dev \
+  && rm -rf /var/lib/apt/lists/*
+COPY scripts/fakekernel32.c /tmp/fakekernel32.c
+RUN gcc -shared -fPIC -O2 -o /tmp/libfakekernel32.so /tmp/fakekernel32.c
+
+FROM mono:6.12
+
+ENV TZ=America/Sao_Paulo \
+    LANG=en_US.UTF-8 \
+    LC_ALL=C \
+    MONO_IOMAP=all
+
+COPY --from=shim-builder /tmp/libfakekernel32.so /usr/local/lib/libfakekernel32.so
+RUN ldconfig
+
+# Add kernel32 -> shim mapping to the existing Mono dllmap config (do NOT
+# overwrite — /etc/mono/config ships with critical mappings like System.Native).
+RUN sed -i 's|</configuration>|  <dllmap dll="kernel32" target="/usr/local/lib/libfakekernel32.so" />\n  <dllmap dll="kernel32.dll" target="/usr/local/lib/libfakekernel32.so" />\n</configuration>|' /etc/mono/config \
+  && grep -A2 -B1 'kernel32' /etc/mono/config
+
+WORKDIR /opt/ddt
+COPY runtime/ /opt/ddt/
+
+# Compiled Game.Logic.dll references map files as "map\<id>\fore.map" via
+# string.Format, and Mono 6.12's MONO_IOMAP=all does NOT translate those for
+# File.Exists. Create symlinks whose filenames contain literal backslashes
+# so File.Exists("map\\1001\\fore.map") resolves on Linux.
+COPY scripts/create-winpath-links.sh /usr/local/bin/create-winpath-links
+RUN chmod +x /usr/local/bin/create-winpath-links \
+  && create-winpath-links /opt/ddt/Fighting \
+  && create-winpath-links /opt/ddt/Road
+
+COPY scripts/run-service.sh /usr/local/bin/run-service
+RUN chmod +x /usr/local/bin/run-service
+
+CMD ["/bin/bash"]
