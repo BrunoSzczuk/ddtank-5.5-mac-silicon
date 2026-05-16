@@ -16,7 +16,7 @@ RUN printf '%s\n' \
   && apt-get -o Acquire::Check-Valid-Until=false update \
   && apt-get install -y --no-install-recommends \
        mono-xsp4 nginx \
-       php-fpm php-cli php-odbc \
+       php-fpm php-cli php-odbc php-gd php-mbstring \
        unixodbc tdsodbc freetds-bin freetds-common \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /run/php /var/log/xsp

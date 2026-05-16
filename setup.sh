@@ -57,6 +57,14 @@ if [ ! -d runtime/site ]; then
         runtime/site/global.php > runtime/site/global.php.tmp \
       && mv runtime/site/global.php.tmp runtime/site/global.php
   fi
+  # Apply our PHP patches over the originals (signup capturing UID, login
+  # using inline EXEC for Mem_Users_Accede, ajax for Webshop_Changepass,
+  # and the _sqlsrv_shim.php itself). These come from patches/site/.
+  for f in patches/site/_sqlsrv_shim.php \
+           patches/site/login.php \
+           patches/site/ajax.php; do
+    [ -f "$f" ] && cp "$f" "runtime/site/$(basename "$f")"
+  done
 fi
 
 if [ ! -d runtime/painel ]; then
@@ -80,6 +88,16 @@ if [ ! -d runtime/painel ]; then
     [ -f "$f" ] || continue
     sed -i.bak -E 's|\.\./Scripts/|Scripts/|g; s|\.\./DDTank/|DDTank/|g' "$f"
   done
+
+  # Site.aspx (no <%@ Page %> directive) crashes the Mono ASP.NET batch
+  # compiler with CS1576 #line 0 and brings down EVERY Admin page along
+  # with it. Disable it.
+  [ -f runtime/painel/Site.aspx ] && mv runtime/painel/Site.aspx runtime/painel/Site.aspx.disabled
+
+  # Login.aspx's <asp:Button CommandName="Login"> triggers Mono's broken
+  # SqliteMembershipProvider before the user-defined click handler runs.
+  # Strip CommandName so only the click handler authenticates.
+  sed -i.bak -E 's| CommandName="Login"||' runtime/painel/Account/Login.aspx 2>/dev/null || true
 fi
 echo "    runtime/ ready (Center, Fighting, Road, site, painel)"
 
