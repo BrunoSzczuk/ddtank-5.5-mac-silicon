@@ -8,8 +8,12 @@ services:
     depends_on:
       mssql:
         condition: service_healthy
+    # Map gameserver to 0.0.0.0 so Mono binds WCF on every interface (so the
+     # site container can reach it via the network alias). When other containers
+     # resolve "gameserver" via Docker DNS they still get the Center container's
+     # real IP — only the local hosts-file mapping uses 0.0.0.0.
     extra_hosts:
-      - "gameserver:127.0.0.1"
+      - "gameserver:0.0.0.0"
     ports:
       - "2008:2008"
       - "2009:2009"

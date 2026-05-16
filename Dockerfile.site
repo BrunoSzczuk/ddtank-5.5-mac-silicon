@@ -44,6 +44,9 @@ ENV TZ=America/Sao_Paulo \
 WORKDIR /opt/site
 COPY runtime/site /opt/site/
 COPY runtime/painel /opt/painel/
+# Note: runtime/request/ (the Flash client gateway) is NOT hosted on the Mac
+# stack. Mono+xsp4 hangs serving Tank.Request.dll; the official Windows
+# client runs this app on IIS instead. See README ("Cliente Windows").
 
 # .aspx pages reference master pages with inconsistent casing (e.g.
 # ~/Homen.master while the real file is Homen.Master). Add lowercase

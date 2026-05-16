@@ -127,12 +127,17 @@ for _ in $(seq 1 30); do
 done
 
 echo ""
+LAN_IP=$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
+LAN_IP=${LAN_IP:-<seu-ip-lan>}
 echo "==========================================="
-echo "Servidor pronto. Endpoints:"
-echo "  Site (PHP login/signup):  http://localhost:8080/"
-echo "  Painel admin:             http://localhost:8081/"
-echo "  SQL Server:               localhost:1433  (sa / ddtank@2016)"
-echo "  Game emulator:            localhost:9200 (Road) 9202 (Center) 9208 (Fighting)"
+echo "Backend pronto. Endpoints (do Mac):"
+echo "  Site (PHP login/signup):  http://localhost:8080/   (LAN: http://$LAN_IP:8080/)"
+echo "  Painel admin:             http://localhost:8081/   (LAN: http://$LAN_IP:8081/)"
+echo "  SQL Server:               localhost:1433           (LAN: $LAN_IP:1433)   sa / ddtank@2016"
+echo "  Game sockets:             9200 (Road) 9202 (Center) 9208 (Fighting)"
+echo ""
+echo "Para jogar precisa de um PC Windows na mesma rede:"
+echo "  docs/CLIENT-WINDOWS.md  — IIS + Request app + Flash Projector"
 echo "==========================================="
 echo "Logs:   docker compose logs -f <service>"
 echo "Stop:   docker compose down"

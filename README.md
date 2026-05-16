@@ -52,14 +52,25 @@ Cada um destes ajustes está versionado no repo, não em runtime puro:
 - **`runtime/site/login.php`** — chamada para `Mem_Users_Accede` reescrita
   com inline EXEC + SELECT (PHP ODBC não suporta OUT parameters).
 
-## Limitação conhecida — cliente Flash
+## Para jogar de fato — precisa de um Windows na rede
 
-`LoginGame.aspx` é a página que o cliente Flash original carregava após
-autenticação. **Flash Player foi descontinuado em 2021** — sem cliente Flash,
-não dá pra "jogar" no sentido tradicional, mesmo com servidor 100% no ar.
-A página retorna 500 (NullReferenceException por Session vazia) quando
-acessada diretamente, e isso é por design do código original. Para uso real
-seria preciso emulador de cliente (Ruffle, etc).
+O **backend é Mac-nativo** (esse repo), mas o **cliente DDTank é Windows-nativo**:
+ele precisa de Flash Player real (não emulado) pra abrir socket TCP no Center, e
+de um trecho ASP.NET (`Servidor5.5/Request/`) que o Mono trava ao executar.
+
+Validei com Ruffle (extensão do Chrome no macOS) e cheguei até o splash do jogo,
+mas a chain trava em `/Request/CreateLogin.aspx` no Mono+xsp4. Tentar destravar
+sem o source do `Tank.Request.dll` é debug às cegas, e mesmo com isso o Ruffle
+tem suporte parcial a AS3 sockets — o jogo dificilmente passaria do login.
+
+**Caminho recomendado**: deixa o Mac rodando o backend e usa um PC Windows
+(físico, VM Parallels ou UTM) na mesma rede como cliente. Passo a passo
+completo em [`docs/CLIENT-WINDOWS.md`](docs/CLIENT-WINDOWS.md).
+
+Resumo:
+- Mac (esse repo): SQL, Center, Fighting, Road, Site PHP, Painel admin
+- Windows: IIS hospedando `Request/`, Flash Projector abrindo `Loading.swf`
+- Conectados pela LAN no IP do Mac (`192.168.0.x:1433`, `:9202`, etc.)
 
 ## Operação
 
@@ -92,6 +103,8 @@ scripts/
   run-service.sh            # launcher mono de cada service
   site-nginx.conf           # routing aspx/php
   start-site.sh             # supervisor manual (xsp4 + php-fpm + nginx)
-runtime/                    # cópia editada de Emulador, Novo Site, Painel
+runtime/                    # cópia editada de Emulador, Novo Site, Painel, Request
 Servidor5.5/                # extraído original (intacto)
+docs/
+  CLIENT-WINDOWS.md         # como montar o cliente Windows na LAN
 ```
