@@ -67,6 +67,10 @@ services:
     ports:
       - "8080:80"
       - "8081:8081"
+    volumes:
+      # Mount the Flash client SWFs and assets read-only so nginx can serve
+      # them under /Flash/. The 120MB tree is too big to bake into the image.
+      - ./Servidor5.5/br/flash:/opt/site/Flash:ro
     restart: "no"
 
   mssql:

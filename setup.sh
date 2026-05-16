@@ -49,9 +49,18 @@ if [ ! -d runtime/site ]; then
   sed -i.bak \
     -e "s|'WIN-IJR04FJ3H42'|'mssql'|g" \
     -e "s|WIN-IJR04FJ3H42|mssql|g" \
-    -e "s|cybertank\\.ml|localhost|g" \
+    -e "s|cybertank\\.ml|localhost:8080|g" \
     -e "s|Driver={SQL Server}|Driver=FreeTDS;Port=1433;TDS_Version=7.4|g" \
     runtime/site/global.php runtime/site/function.php runtime/site/login.php runtime/site/Web.config 2>/dev/null || true
+  # Also rewrite the Flash client config.xml URLs so the SWF loader points
+  # back at our nginx instead of the original cybertank.ml/akamaihd/7road CDNs.
+  if [ -f runtime/site/config.xml ]; then
+    sed -i.bak \
+      -e 's|http://cybertank\.ml/|http://localhost:8080/|g' \
+      -e 's|http://ddt-a\.akamaihd\.net/|http://localhost:8080/|g' \
+      -e 's|http://assayerhandler\.7road\.com/|http://localhost:8080/|g' \
+      runtime/site/config.xml
+  fi
   if ! grep -q "_sqlsrv_shim" runtime/site/global.php; then
     awk '/@session_start/ { print; print "require_once __DIR__ . '\''/_sqlsrv_shim.php'\'';"; next } { print }' \
         runtime/site/global.php > runtime/site/global.php.tmp \
