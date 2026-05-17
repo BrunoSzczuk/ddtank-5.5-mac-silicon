@@ -97,13 +97,23 @@ if [ ! -d runtime/site ]; then
   # Apply our PHP patches over the originals (signup capturing UID, login
   # using inline EXEC for Mem_Users_Accede, ajax for Webshop_Changepass,
   # and the _sqlsrv_shim.php itself). These come from patches/site/.
+  # Detect LAN IP early so we can bake it into config-lan.xml when copying.
+  LAN_IP_FOR_CONFIG=$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
+  LAN_IP_FOR_CONFIG=${LAN_IP_FOR_CONFIG:-127.0.0.1}
   for f in patches/site/_sqlsrv_shim.php \
            patches/site/login.php \
            patches/site/ajax.php \
            patches/site/play.php \
            patches/site/config.xml \
+           patches/site/config-lan.xml \
            patches/site/md5.xml; do
-    [ -f "$f" ] && cp "$f" "runtime/site/$(basename "$f")"
+    [ -f "$f" ] || continue
+    dest="runtime/site/$(basename "$f")"
+    if [ "$(basename "$f")" = "config-lan.xml" ]; then
+      sed "s|__LAN_IP__|$LAN_IP_FOR_CONFIG|g" "$f" > "$dest"
+    else
+      cp "$f" "$dest"
+    fi
   done
 
   # Download self-hosted Ruffle nightly (the released 0.2.0 has worse AS3

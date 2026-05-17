@@ -26,6 +26,8 @@ services:
       - "9300:9300"
       - "9302:9302"
       - "9308:9308"
+      # Flash Socket Policy server (sidecar in this network namespace)
+      - "843:843"
     networks:
       default:
         aliases:
@@ -57,6 +59,28 @@ services:
     command: ["run-service", "Road"]
     stdin_open: true
     tty: true
+    restart: "no"
+
+  # Flash Player Socket Policy server (port 843). The Flash standalone
+  # Projector pings 843 before opening any Socket; if there's no permissive
+  # policy file it refuses to connect. Center itself can't speak the XML
+  # policy protocol (its 9202 socket cuts straight into the game wire
+  # format), so we run a tiny sidecar here.
+  flash-policy:
+    image: alpine/socat:latest
+    container_name: ddt-flash-policy
+    depends_on:
+      - center
+    network_mode: "service:center"
+    volumes:
+      - ./scripts/flash-policy.xml:/policy.xml:ro
+    # socat reads the policy file (must end with NUL, which we append) and
+    # writes it on every TCP connect to :843. Flash clients send their
+    # "<policy-file-request/>\0" and then read the response; we just stream
+    # the policy unconditionally.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "cat /policy.xml > /tmp/p && printf '\\0' >> /tmp/p && exec socat -T 3 TCP-LISTEN:843,reuseaddr,fork SYSTEM:'cat /tmp/p'"
     restart: "no"
 
   # WebSocket -> TCP bridges so Ruffle (in the browser) can talk to the game
